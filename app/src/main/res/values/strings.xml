@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Koma</string>
+    <string name="home_no_servers_title">No servers yet</string>
+    <string name="home_no_servers_body">Add a Komga, Kavita, or Calibre-Web server to get started.</string>
+    <string name="home_add_server">Add server</string>
+    <string name="add_server_title">Add Server</string>
+    <string name="add_server_type_label">Server Type</string>
+    <string name="add_server_url_label">Server URL</string>
+    <string name="add_server_url_hint">https://komga.example.com</string>
+    <string name="add_server_username_label">Username</string>
+    <string name="add_server_password_label">Password</string>
+    <string name="add_server_name_label">Display Name (optional)</string>
+    <string name="add_server_test_button">Test Connection</string>
+    <string name="add_server_save_button">Save</string>
+    <string name="add_server_testing">Testing connection…</string>
+    <string name="add_server_success">Connected!</string>
+    <string name="add_server_error">Connection failed: %1$s</string>
+    <string name="label_komga">Komga</string>
+    <string name="label_kavita">Kavita</string>
+    <string name="label_calibre_web">Calibre-Web</string>
+    <string name="reader_page_format">Page %1$d of %2$d</string>
+</resources>
