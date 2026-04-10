@@ -8,6 +8,9 @@ data class DownloadEntity(
     @PrimaryKey val bookId: String,
     val serverId: String,
     val bookTitle: String,
+    val seriesId: String = "",
+    val seriesTitle: String = "",
+    val thumbUrl: String = "",
     val state: String,        // QUEUED, DOWNLOADING, COMPLETE, FAILED
     val bytesDownloaded: Long = 0,
     val totalBytes: Long = 0,

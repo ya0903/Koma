@@ -24,6 +24,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.res.painterResource
+import com.koma.client.R
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -178,6 +180,7 @@ class SeriesDetailViewModel @Inject constructor(
                 val mediaServer = registry.get(server)
                 val selectedIds = _state.value.selectedBookIds
                 val books = _state.value.books.filter { it.id in selectedIds }
+                val currentSeries = _state.value.series
                 books.forEach { book ->
                     val url = mediaServer.fileUrl(book.id)
                     downloadRepository.enqueue(
@@ -186,6 +189,9 @@ class SeriesDetailViewModel @Inject constructor(
                         title = book.title,
                         fileUrl = url,
                         mediaType = book.mediaType.name,
+                        seriesId = book.seriesId,
+                        seriesTitle = currentSeries?.title ?: book.seriesTitle,
+                        thumbUrl = book.thumbUrl ?: currentSeries?.thumbUrl ?: "",
                     )
                 }
                 _state.update { it.copy(isSelectMode = false, selectedBookIds = emptySet()) }
@@ -504,8 +510,9 @@ fun SeriesDetailScreen(
                             Row {
                                 IconButton(onClick = { viewModel.toggleSort() }) {
                                     Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.List,
-                                        contentDescription = if (state.sortAscending) "Sort descending" else "Sort ascending",
+                                        painter = painterResource(id = R.drawable.ic_sort_order),
+                                        contentDescription = "Toggle sort order",
+                                        modifier = Modifier.size(20.dp),
                                     )
                                 }
                                 TextButton(onClick = { viewModel.toggleSelectMode() }) {

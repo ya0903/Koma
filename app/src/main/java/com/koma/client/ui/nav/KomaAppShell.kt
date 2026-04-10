@@ -28,6 +28,7 @@ import com.koma.client.domain.model.MediaType
 import com.koma.client.ui.dashboard.DashboardScreen
 import com.koma.client.ui.offline.OfflineScreen
 import com.koma.client.ui.series.SeriesDetailScreen
+import com.koma.client.ui.series.SeriesListScreen
 import com.koma.client.ui.server.ServerScreen
 import com.koma.client.ui.settings.SettingsScreen
 
@@ -92,6 +93,7 @@ fun KomaAppShell(
                         modifier = Modifier.padding(padding),
                     )
                     KomaTab.OFFLINE -> OfflineTabNav(
+                        onOpenReader = onOpenReader,
                         modifier = Modifier.padding(padding),
                     )
                     KomaTab.SERVER -> ServerTabNav(
@@ -123,7 +125,7 @@ private fun HomeTabNav(
                 onBookClick = { bookId, mediaType -> onOpenReader(bookId, mediaType) },
                 onSeriesClick = { seriesId -> navController.navigate("home_series_detail/$seriesId") },
                 onSeeAllLibraries = { /* no-op in tab nav */ },
-                onSeeAll = { /* could navigate to a full list */ },
+                onSeeAll = { libraryId -> navController.navigate("home_series_list/$libraryId") },
             )
         }
         composable("home_series_detail/{seriesId}") {
@@ -132,15 +134,27 @@ private fun HomeTabNav(
                 onBack = { navController.popBackStack() },
             )
         }
+        composable("home_series_list/{libraryId}") {
+            SeriesListScreen(
+                onSeriesClick = { seriesId -> navController.navigate("home_series_detail/$seriesId") },
+            )
+        }
     }
 }
 
 @Composable
 private fun OfflineTabNav(
+    onOpenReader: (bookId: String, mediaType: MediaType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OfflineScreen(modifier = modifier)
+    OfflineScreen(
+        modifier = modifier,
+        onOpenReader = { bookId, mediaType ->
+            onOpenReader(bookId, MediaType.valueOf(mediaType))
+        },
+    )
 }
+
 
 @Composable
 private fun ServerTabNav(

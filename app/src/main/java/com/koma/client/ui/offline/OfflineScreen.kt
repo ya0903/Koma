@@ -1,10 +1,11 @@
 package com.koma.client.ui.offline
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,17 +13,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -36,23 +38,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavBackStackEntry
+import coil3.compose.AsyncImage
 import com.koma.client.domain.model.Download
 import com.koma.client.domain.model.DownloadState
 import com.koma.client.domain.repo.DownloadRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+// ─── Data model for grouped series ────────────────────────────────────────────
+
+data class DownloadedSeries(
+    val seriesId: String,
+    val seriesTitle: String,
+    val thumbUrl: String,
+    val downloadCount: Int,
+    val totalBytes: Long,
+)
+
+// ─── ViewModel ────────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class OfflineViewModel @Inject constructor(
@@ -63,6 +86,33 @@ class OfflineViewModel @Inject constructor(
         .observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val seriesGroups: StateFlow<List<DownloadedSeries>> = downloadRepository
+        .observeAll()
+        .map { list ->
+            list
+                .filter { it.state == DownloadState.COMPLETE || it.state == DownloadState.DOWNLOADING || it.state == DownloadState.QUEUED }
+                .groupBy { it.seriesId.ifBlank { it.bookId } }
+                .map { (groupKey, books) ->
+                    DownloadedSeries(
+                        seriesId = groupKey,
+                        seriesTitle = books.first().seriesTitle.ifBlank { books.first().bookTitle },
+                        thumbUrl = books.first().thumbUrl,
+                        downloadCount = books.size,
+                        totalBytes = books.sumOf { it.totalBytes },
+                    )
+                }
+                .sortedBy { it.seriesTitle }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun downloadsForSeries(seriesId: String): List<Download> {
+        val all = downloads.value
+        return all.filter { download ->
+            val groupKey = download.seriesId.ifBlank { download.bookId }
+            groupKey == seriesId
+        }
+    }
+
     fun delete(bookId: String) {
         viewModelScope.launch { downloadRepository.delete(bookId) }
     }
@@ -72,58 +122,67 @@ class OfflineViewModel @Inject constructor(
             downloads.value.forEach { downloadRepository.delete(it.bookId) }
         }
     }
+
+    fun deleteSeriesDownloads(seriesId: String) {
+        viewModelScope.launch {
+            downloadsForSeries(seriesId).forEach { downloadRepository.delete(it.bookId) }
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ─── Top-level offline nav ─────────────────────────────────────────────────────
+
 @Composable
 fun OfflineScreen(
     modifier: Modifier = Modifier,
     onOpenReader: ((bookId: String, mediaType: String) -> Unit)? = null,
+) {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = "offline_grid", modifier = modifier) {
+        composable("offline_grid") {
+            OfflineSeriesGrid(
+                onSeriesClick = { seriesId -> navController.navigate("offline_chapters/$seriesId") },
+            )
+        }
+        composable("offline_chapters/{seriesId}") { backStack ->
+            val seriesId = backStack.arguments?.getString("seriesId") ?: return@composable
+            OfflineChaptersScreen(
+                seriesId = seriesId,
+                onBookClick = { bookId, mediaType -> onOpenReader?.invoke(bookId, mediaType) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+    }
+}
+
+// ─── Screen 1: Series grid ─────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OfflineSeriesGrid(
+    onSeriesClick: (seriesId: String) -> Unit,
     viewModel: OfflineViewModel = hiltViewModel(),
 ) {
-    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
-    var showMenu by remember { mutableStateOf(false) }
+    val groups by viewModel.seriesGroups.collectAsStateWithLifecycle()
     var showDeleteAllDialog by remember { mutableStateOf(false) }
-
-    val active = downloads.filter { it.state == DownloadState.DOWNLOADING }
-    val queued = downloads.filter { it.state == DownloadState.QUEUED }
-    val complete = downloads.filter { it.state == DownloadState.COMPLETE }
-    val failed = downloads.filter { it.state == DownloadState.FAILED }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Downloads") },
                 actions = {
-                    if (downloads.isNotEmpty()) {
-                        Box {
-                            IconButton(onClick = { showMenu = true }) {
-                                Icon(Icons.Filled.MoreVert, contentDescription = "More options")
-                            }
-                            DropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Delete All") },
-                                    leadingIcon = {
-                                        Icon(Icons.Filled.Delete, contentDescription = null)
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        showDeleteAllDialog = true
-                                    },
-                                )
-                            }
+                    if (groups.isNotEmpty()) {
+                        IconButton(onClick = { showDeleteAllDialog = true }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete all")
                         }
                     }
                 },
             )
         },
     ) { padding ->
-        if (downloads.isEmpty()) {
+        if (groups.isEmpty()) {
             Box(
-                modifier = modifier
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
                 contentAlignment = Alignment.Center,
@@ -150,56 +209,24 @@ fun OfflineScreen(
                 }
             }
         } else {
-            LazyColumn(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(padding),
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(120.dp),
+                contentPadding = PaddingValues(
+                    start = 8.dp,
+                    end = 8.dp,
+                    top = padding.calculateTopPadding() + 8.dp,
+                    bottom = padding.calculateBottomPadding() + 8.dp,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize(),
             ) {
-                if (active.isNotEmpty()) {
-                    item { SectionHeader("Downloading") }
-                    items(active, key = { it.bookId }) { download ->
-                        DownloadItem(
-                            download = download,
-                            onDelete = { viewModel.delete(download.bookId) },
-                            onOpen = onOpenReader,
-                        )
-                    }
+                items(groups, key = { it.seriesId }) { group ->
+                    DownloadedSeriesCard(
+                        series = group,
+                        onClick = { onSeriesClick(group.seriesId) },
+                    )
                 }
-
-                if (queued.isNotEmpty()) {
-                    item { SectionHeader("Queued") }
-                    items(queued, key = { it.bookId }) { download ->
-                        DownloadItem(
-                            download = download,
-                            onDelete = { viewModel.delete(download.bookId) },
-                            onOpen = onOpenReader,
-                        )
-                    }
-                }
-
-                if (complete.isNotEmpty()) {
-                    item { SectionHeader("Completed") }
-                    items(complete, key = { it.bookId }) { download ->
-                        DownloadItem(
-                            download = download,
-                            onDelete = { viewModel.delete(download.bookId) },
-                            onOpen = onOpenReader,
-                        )
-                    }
-                }
-
-                if (failed.isNotEmpty()) {
-                    item { SectionHeader("Failed") }
-                    items(failed, key = { it.bookId }) { download ->
-                        DownloadItem(
-                            download = download,
-                            onDelete = { viewModel.delete(download.bookId) },
-                            onOpen = onOpenReader,
-                        )
-                    }
-                }
-
-                item { Spacer(Modifier.height(16.dp)) }
             }
         }
     }
@@ -223,27 +250,129 @@ fun OfflineScreen(
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Column {
-        HorizontalDivider()
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+private fun DownloadedSeriesCard(
+    series: DownloadedSeries,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+    ) {
+        Column {
+            AsyncImage(
+                model = series.thumbUrl.ifBlank { null },
+                contentDescription = series.seriesTitle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                contentScale = ContentScale.Crop,
+            )
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = series.seriesTitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val countLabel = if (series.downloadCount == 1) {
+                    "1 chapter"
+                } else {
+                    "${series.downloadCount} chapters"
+                }
+                Text(
+                    text = countLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// ─── Screen 2: Chapters within a series ───────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OfflineChaptersScreen(
+    seriesId: String,
+    onBookClick: (bookId: String, mediaType: String) -> Unit,
+    onBack: () -> Unit,
+    viewModel: OfflineViewModel = hiltViewModel(),
+) {
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
+    val seriesDownloads = downloads.filter { download ->
+        val groupKey = download.seriesId.ifBlank { download.bookId }
+        groupKey == seriesId
+    }
+    val seriesTitle = seriesDownloads.firstOrNull()?.seriesTitle?.ifBlank { null }
+        ?: seriesDownloads.firstOrNull()?.bookTitle
+        ?: "Downloads"
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        seriesTitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        if (seriesDownloads.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("No chapters found")
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                items(seriesDownloads, key = { it.bookId }) { download ->
+                    ChapterDownloadItem(
+                        download = download,
+                        onDelete = { viewModel.delete(download.bookId) },
+                        onOpen = { onBookClick(download.bookId, download.mediaType) },
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun DownloadItem(
+private fun ChapterDownloadItem(
     download: Download,
     onDelete: () -> Unit,
-    onOpen: ((bookId: String, mediaType: String) -> Unit)?,
+    onOpen: () -> Unit,
 ) {
     ListItem(
+        modifier = Modifier.clickable(enabled = download.state == DownloadState.COMPLETE) {
+            onOpen()
+        },
         headlineContent = {
-            Text(download.bookTitle, maxLines = 1)
+            Text(download.bookTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingContent = {
+            AsyncImage(
+                model = download.thumbUrl.ifBlank { null },
+                contentDescription = download.bookTitle,
+                modifier = Modifier.size(48.dp, 64.dp),
+                contentScale = ContentScale.Crop,
+            )
         },
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -284,7 +413,7 @@ private fun DownloadItem(
                     }
                     DownloadState.QUEUED -> {
                         Text(
-                            "Waiting to download…",
+                            "Waiting to download...",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

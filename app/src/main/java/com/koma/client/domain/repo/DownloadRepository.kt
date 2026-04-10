@@ -11,6 +11,9 @@ interface DownloadRepository {
         title: String,
         fileUrl: String,
         mediaType: String,
+        seriesId: String = "",
+        seriesTitle: String = "",
+        thumbUrl: String = "",
     )
     suspend fun delete(bookId: String)
     suspend fun getByBookId(bookId: String): Download?
