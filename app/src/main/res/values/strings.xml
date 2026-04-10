@@ -4,6 +4,10 @@
     <string name="home_no_servers_title">No servers yet</string>
     <string name="home_no_servers_body">Add a Komga, Kavita, Calibre-Web, or OPDS server to get started.</string>
     <string name="home_add_server">Add server</string>
+    <string name="home_get_started">Get Started</string>
+    <string name="home_subtitle">Your self-hosted reading companion</string>
+    <string name="add_server_connect_title">Connect to your server</string>
+    <string name="add_server_save_connect_button">Save &amp; Connect</string>
     <string name="add_server_title">Add Server</string>
     <string name="add_server_type_label">Server Type</string>
     <string name="add_server_url_label">Server URL</string>
