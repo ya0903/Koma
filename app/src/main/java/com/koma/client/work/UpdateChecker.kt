@@ -22,6 +22,14 @@ data class GithubRelease(
     @SerialName("html_url") val htmlUrl: String,
     val name: String? = null,
     val body: String? = null,
+    val assets: List<GithubAsset> = emptyList(),
+)
+
+@Serializable
+data class GithubAsset(
+    val name: String,
+    @SerialName("browser_download_url") val downloadUrl: String,
+    val size: Long = 0,
 )
 
 data class UpdateInfo(
@@ -29,6 +37,7 @@ data class UpdateInfo(
     val latestVersion: String = "",
     val currentVersion: String = "",
     val releaseUrl: String = "",
+    val apkDownloadUrl: String? = null,
 )
 
 @Singleton
@@ -68,12 +77,14 @@ class UpdateChecker @Inject constructor(
             val release = json.decodeFromString<GithubRelease>(body)
             val latestVersion = release.tagName.trimStart('v')
             val isNewer = isVersionNewer(latestVersion, currentVersion)
+            val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
 
             val info = UpdateInfo(
                 available = isNewer,
                 latestVersion = latestVersion,
                 currentVersion = currentVersion,
                 releaseUrl = release.htmlUrl,
+                apkDownloadUrl = apkAsset?.downloadUrl,
             )
             _updateInfo.value = info
             info

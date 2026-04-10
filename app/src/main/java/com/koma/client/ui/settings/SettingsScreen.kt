@@ -1,6 +1,8 @@
 package com.koma.client.ui.settings
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,8 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -24,6 +28,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -41,6 +47,7 @@ import com.koma.client.ui.reader.common.FitMode
 import com.koma.client.ui.reader.common.PageLayout
 import com.koma.client.ui.reader.common.ReaderPreferences
 import com.koma.client.ui.reader.common.ReadingDirection
+import com.koma.client.work.ApkInstaller
 import com.koma.client.work.UpdateCheckWorker
 import com.koma.client.work.UpdateChecker
 import com.koma.client.work.UpdateInfo
@@ -82,6 +89,7 @@ class SettingsViewModel @Inject constructor(
     private val readerPrefs: ReaderPreferences,
     @ApplicationContext private val context: Context,
     private val updateChecker: UpdateChecker,
+    private val apkInstaller: ApkInstaller,
 ) : ViewModel() {
 
     val appContext: Context = context
@@ -91,6 +99,9 @@ class SettingsViewModel @Inject constructor(
 
     private val _checkingUpdate = MutableStateFlow(false)
     val checkingUpdate: StateFlow<Boolean> = _checkingUpdate.asStateFlow()
+
+    val downloadProgress: StateFlow<Float> = apkInstaller.progress
+    val isDownloading: StateFlow<Boolean> = apkInstaller.downloading
 
     val state: StateFlow<SettingsUiState> = combine(
         readerPrefs.fitMode,
@@ -167,6 +178,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun downloadAndInstallUpdate() {
+        val info = _updateInfo.value ?: return
+        viewModelScope.launch {
+            val apkUrl = info.apkDownloadUrl
+            if (apkUrl != null) {
+                apkInstaller.downloadAndInstall(apkUrl)
+            } else {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl)).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            }
+        }
+    }
+
     fun setAutoUpdateCheck(enabled: Boolean) {
         viewModelScope.launch {
             context.appPrefsDataStore.edit { it[AppPrefsKeys.AUTO_UPDATE_CHECK] = enabled }
@@ -196,6 +222,8 @@ fun SettingsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     val checkingUpdate by viewModel.checkingUpdate.collectAsStateWithLifecycle()
+    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+    val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showFitModeDialog by remember { mutableStateOf(false) }
     var showDirectionDialog by remember { mutableStateOf(false) }
@@ -281,15 +309,45 @@ fun SettingsScreen(
                 headlineContent = { Text("Check for Updates") },
                 supportingContent = {
                     when {
-                        checkingUpdate -> Text("Checking…")
-                        updateInfo?.available == true ->
-                            Text("Update available: v${updateInfo!!.latestVersion}")
-                        updateInfo != null ->
-                            Text("Up to date (v${updateInfo!!.currentVersion})")
+                        checkingUpdate -> Text("Checking…", color = MaterialTheme.colorScheme.primary)
+                        updateInfo?.available == true -> {
+                            Column {
+                                Text(
+                                    "New version: v${updateInfo!!.latestVersion}",
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                if (isDownloading) {
+                                    LinearProgressIndicator(
+                                        progress = { downloadProgress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp),
+                                    )
+                                    Text("Downloading… ${(downloadProgress * 100).toInt()}%")
+                                } else {
+                                    Button(
+                                        onClick = { viewModel.downloadAndInstallUpdate() },
+                                        modifier = Modifier.padding(top = 8.dp),
+                                    ) {
+                                        Text("Download & Install")
+                                    }
+                                }
+                            }
+                        }
+                        updateInfo != null && !updateInfo!!.available ->
+                            Text("You're up to date (v${updateInfo!!.currentVersion})")
                         else -> Text("Tap to check for a new version")
                     }
                 },
-                modifier = Modifier.clickable(enabled = !checkingUpdate) {
+                trailingContent = {
+                    if (checkingUpdate) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                },
+                modifier = Modifier.clickable(enabled = !checkingUpdate && !isDownloading) {
                     viewModel.checkForUpdates()
                 },
             )
