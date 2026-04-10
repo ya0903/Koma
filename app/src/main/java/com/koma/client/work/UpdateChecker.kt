@@ -37,9 +37,8 @@ class UpdateChecker @Inject constructor(
     @BaseOkHttpClient private val okHttpClient: OkHttpClient,
     private val json: Json,
 ) {
-    // TODO: Replace placeholder-owner with the real GitHub org/username before publishing
-    private val githubOwner = "placeholder-owner"
-    private val githubRepo = "koma"
+    private val githubOwner = "ya0903"
+    private val githubRepo = "Koma"
 
     private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
     val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()

@@ -2,6 +2,7 @@ package com.koma.client.ui.reader.image
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -41,28 +42,34 @@ fun ReaderPage(
             },
         contentAlignment = Alignment.Center,
     ) {
-        SubcomposeAsyncImage(
-            model = imageUrl,
-            contentDescription = null,
-            contentScale = contentScale,
+        Box(
             modifier = Modifier
                 .widthIn(max = 600.dp)
-                .fillMaxWidth(),
-            loading = {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White)
-                }
-            },
-            error = {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "Error loading page:\n$imageUrl",
-                        color = Color.Red,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            },
-        )
+                .fillMaxHeight()
+                .align(Alignment.Center),
+            contentAlignment = Alignment.Center,
+        ) {
+            SubcomposeAsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                contentScale = contentScale,
+                modifier = Modifier.fillMaxWidth(),
+                loading = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                },
+                error = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Error loading page:\n$imageUrl",
+                            color = Color.Red,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                },
+            )
+        }
     }
 }
