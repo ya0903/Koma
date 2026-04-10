@@ -25,10 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -49,7 +47,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.vectorResource
+import com.koma.client.R
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -64,7 +65,9 @@ import com.koma.client.data.reader.EpubDownloader
 import com.koma.client.data.reader.EpubParser
 import com.koma.client.data.server.MediaServerRegistry
 import com.koma.client.domain.model.Bookmark
+import com.koma.client.domain.model.DownloadState
 import com.koma.client.domain.repo.BookmarkRepository
+import com.koma.client.domain.repo.DownloadRepository
 import com.koma.client.domain.repo.ReadProgressRepository
 import com.koma.client.domain.repo.ServerRepository
 import com.koma.client.ui.reader.common.EpubFontFamily
@@ -118,6 +121,7 @@ class EpubReaderViewModel @Inject constructor(
     private val progressRepo: ReadProgressRepository,
     private val readerPrefs: ReaderPreferences,
     private val bookmarkRepo: BookmarkRepository,
+    private val downloadRepo: DownloadRepository,
 ) : ViewModel() {
 
     val bookId: String = savedStateHandle["bookId"] ?: ""
@@ -140,10 +144,20 @@ class EpubReaderViewModel @Inject constructor(
                 val server = serverRepo.getActive() ?: throw Exception("No active server")
                 val mediaServer = registry.get(server)
                 val book = mediaServer.book(bookId)
-                val fileUrl = mediaServer.fileUrl(bookId)
 
-                // Download the EPUB
-                val epubFile = downloader.download(bookId, fileUrl)
+                // Check if book is already downloaded locally
+                val localDownload = downloadRepo.getByBookId(bookId)
+                val epubFile = if (localDownload != null &&
+                    localDownload.state == DownloadState.COMPLETE &&
+                    localDownload.filePath != null
+                ) {
+                    // Use already-downloaded file
+                    java.io.File(localDownload.filePath)
+                } else {
+                    // Download from network
+                    val fileUrl = mediaServer.fileUrl(bookId)
+                    downloader.download(bookId, fileUrl)
+                }
                 _uiState.update { it.copy(downloading = false, bookTitle = book.title) }
 
                 // Parse the EPUB
@@ -580,9 +594,11 @@ fun EpubReaderScreen(
                     }
                     IconButton(onClick = { viewModel.addBookmark() }) {
                         Icon(
-                            if (isChapterBookmarked) Icons.Filled.Favorite else Icons.Filled.Star,
-                            contentDescription = if (isChapterBookmarked) "Bookmarked" else "Add bookmark",
-                            tint = if (isChapterBookmarked) MaterialTheme.colorScheme.primary
+                            ImageVector.vectorResource(
+                                id = if (isChapterBookmarked) R.drawable.ic_bookmark_fill else R.drawable.ic_bookmark,
+                            ),
+                            contentDescription = if (isChapterBookmarked) "Remove bookmark" else "Add bookmark",
+                            tint = if (isChapterBookmarked) Color(0xFFFFD700)
                                    else MaterialTheme.colorScheme.onSurface,
                         )
                     }

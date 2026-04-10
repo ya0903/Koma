@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Koma</string>
     <string name="home_no_servers_title">No servers yet</string>
-    <string name="home_no_servers_body">Add a Komga, Kavita, or Calibre-Web server to get started.</string>
+    <string name="home_no_servers_body">Add a Komga, Kavita, Calibre-Web, or OPDS server to get started.</string>
     <string name="home_add_server">Add server</string>
     <string name="add_server_title">Add Server</string>
     <string name="add_server_type_label">Server Type</string>
@@ -19,5 +19,6 @@
     <string name="label_komga">Komga</string>
     <string name="label_kavita">Kavita</string>
     <string name="label_calibre_web">Calibre-Web</string>
+    <string name="label_opds">OPDS</string>
     <string name="reader_page_format">Page %1$d of %2$d</string>
 </resources>

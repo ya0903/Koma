@@ -48,6 +48,14 @@ open class CredentialStore @Inject constructor(
     open fun storeJwtToken(serverId: String, token: String) {
         prefs.edit()
             .putString("${serverId}_jwt", token)
-            .apply()
+            .commit()
+    }
+
+    open fun getApiKey(serverId: String): String? = prefs.getString("${serverId}_apikey", null)
+
+    open fun storeApiKey(serverId: String, apiKey: String) {
+        prefs.edit()
+            .putString("${serverId}_apikey", apiKey)
+            .commit()
     }
 }

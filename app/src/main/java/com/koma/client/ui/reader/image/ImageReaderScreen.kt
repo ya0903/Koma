@@ -37,9 +37,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.koma.client.data.reader.LocalPageExtractor
 import com.koma.client.data.server.MediaServerRegistry
 import com.koma.client.domain.model.Bookmark
+import com.koma.client.domain.model.DownloadState
 import com.koma.client.domain.repo.BookmarkRepository
+import com.koma.client.domain.repo.DownloadRepository
 import com.koma.client.domain.repo.ReadProgressRepository
 import com.koma.client.domain.repo.ServerRepository
 import com.koma.client.ui.reader.common.FitMode
@@ -67,6 +70,7 @@ data class ImageReaderUiState(
     val showBookmarks: Boolean = false,
     val bookmarks: List<Bookmark> = emptyList(),
     val brightness: Float = -1f, // -1 = system default
+    val isOffline: Boolean = false,
     val error: String? = null,
 )
 
@@ -149,6 +153,8 @@ class HiltImageReaderViewModel @Inject constructor(
     private val progressRepo: ReadProgressRepository,
     private val readerPrefs: ReaderPreferences,
     private val bookmarkRepo: BookmarkRepository,
+    private val downloadRepo: DownloadRepository,
+    private val localPageExtractor: LocalPageExtractor,
 ) : ViewModel() {
 
     private val bookId: String = savedStateHandle["bookId"] ?: ""
@@ -170,9 +176,23 @@ class HiltImageReaderViewModel @Inject constructor(
                 val server = serverRepo.getActive() ?: return@launch
                 val mediaServer = registry.get(server)
                 val book = mediaServer.book(bookId)
-                val urls = (0 until book.pageCount).map { page ->
-                    mediaServer.pageUrl(bookId, page)
+
+                // Check if book is downloaded locally
+                val download = downloadRepo.getByBookId(bookId)
+                val isOffline = download != null &&
+                    download.state == DownloadState.COMPLETE &&
+                    download.filePath != null &&
+                    download.mediaType == "IMAGE"
+
+                val urls = if (isOffline) {
+                    // Use local file — extract pages from CBZ
+                    localPageExtractor.extractPages(download!!.filePath!!)
+                } else {
+                    (0 until book.pageCount).map { page ->
+                        mediaServer.pageUrl(bookId, page)
+                    }
                 }
+
                 val savedProgress = progressRepo.get(bookId)
                 _uiState.update {
                     it.copy(
@@ -180,6 +200,7 @@ class HiltImageReaderViewModel @Inject constructor(
                         bookTitle = book.title,
                         pageUrls = urls,
                         currentPage = savedProgress?.page ?: 0,
+                        isOffline = isOffline,
                     )
                 }
             } catch (e: Exception) {
@@ -458,6 +479,7 @@ fun ImageReaderScreen(
             totalPages = state.pageUrls.size,
             bookmarks = state.bookmarks,
             brightness = state.brightness,
+            isOffline = state.isOffline,
             onBack = onBack,
             onPageChange = { viewModel.goToPage(it) },
             onSettingsClick = { viewModel.showSettings() },

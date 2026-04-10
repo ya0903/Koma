@@ -35,5 +35,14 @@ data class ServerCapabilities(
             readlists = false,
             nativeSeries = false,
         )
+
+        fun opdsDefaults() = ServerCapabilities(
+            serverProgressSync = false,  // OPDS has no progress API
+            serverBookmarks = false,
+            nativeSearch = true,         // some OPDS feeds support search
+            collections = false,
+            readlists = false,
+            nativeSeries = false,        // OPDS is flat; we group by series metadata
+        )
     }
 }

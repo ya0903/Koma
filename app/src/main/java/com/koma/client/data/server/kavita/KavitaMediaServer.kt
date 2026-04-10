@@ -66,6 +66,9 @@ class KavitaMediaServer(
         val password = credentialStore.getPassword(id) ?: ""
         val response = api.login(KavitaLoginRequest(username, password))
         credentialStore.storeJwtToken(id, response.token)
+        if (response.apiKey.isNotBlank()) {
+            credentialStore.storeApiKey(id, response.apiKey)
+        }
         Result.success(Unit)
     } catch (e: retrofit2.HttpException) {
         Result.failure(Exception("Kavita login failed (HTTP ${e.code()}): ${e.message()}. Check your credentials and server URL."))
@@ -79,14 +82,15 @@ class KavitaMediaServer(
     }
 
     override fun series(libraryId: String, filter: SeriesFilter): Flow<List<Series>> = flow {
+        val allSeries = api.getSeries()
         val libId = libraryId.toIntOrNull()
-        val seriesList = api.getSeries(libraryId = libId).map { it.toDomain(id, baseUrl) }
-        emit(seriesList)
+        val filtered = if (libId != null) allSeries.filter { it.libraryId == libId } else allSeries
+        emit(filtered.map { it.toDomain(id, baseUrl, credentialStore.getApiKey(id)) })
     }
 
     override suspend fun seriesDetail(id: String): Series {
         val intId = id.toIntOrNull() ?: throw IllegalArgumentException("Invalid series ID: $id")
-        return api.getSeriesDetail(intId).toDomain(this.id, baseUrl)
+        return api.getSeriesDetail(intId).toDomain(this.id, baseUrl, credentialStore.getApiKey(id))
     }
 
     override fun books(seriesId: String): Flow<List<Book>> = flow {
@@ -104,6 +108,7 @@ class KavitaMediaServer(
                     baseUrl = baseUrl,
                     seriesId = intSeriesId,
                     seriesTitle = seriesTitle,
+                    apiKey = credentialStore.getApiKey(id),
                 )
             }
         }
@@ -117,6 +122,7 @@ class KavitaMediaServer(
             serverId = this.id,
             baseUrl = baseUrl,
             seriesId = chapter.seriesId,
+            apiKey = credentialStore.getApiKey(this.id),
         )
     }
 
@@ -124,18 +130,24 @@ class KavitaMediaServer(
      * Kavita pages are 0-indexed: page=0 is the first page.
      * The [page] parameter from our domain is also 0-indexed, so pass directly.
      */
+    private fun apiKeyParam(): String {
+        val key = credentialStore.getApiKey(id) ?: return ""
+        return "&apiKey=$key"
+    }
+
     override suspend fun pageUrl(bookId: String, page: Int): String =
-        "${baseUrl.trimEnd('/')}/api/Reader/image?chapterId=$bookId&page=$page"
+        "${baseUrl.trimEnd('/')}/api/Reader/image?chapterId=$bookId&page=$page${apiKeyParam()}"
 
     override suspend fun fileUrl(bookId: String): String =
-        "${baseUrl.trimEnd('/')}/api/Reader/file?chapterId=$bookId"
+        "${baseUrl.trimEnd('/')}/api/Reader/file?chapterId=$bookId${apiKeyParam()}"
 
     override suspend fun thumbnailUrl(id: String, kind: ThumbKind): String {
         val base = baseUrl.trimEnd('/')
+        val key = apiKeyParam()
         return when (kind) {
-            ThumbKind.SERIES -> "$base/api/Image/series-cover?seriesId=$id"
-            ThumbKind.BOOK -> "$base/api/Image/chapter-cover?chapterId=$id"
-            ThumbKind.LIBRARY -> "$base/api/Image/library-cover?libraryId=$id"
+            ThumbKind.SERIES -> "$base/api/Image/series-cover?seriesId=$id$key"
+            ThumbKind.BOOK -> "$base/api/Image/chapter-cover?chapterId=$id$key"
+            ThumbKind.LIBRARY -> "$base/api/Image/library-cover?libraryId=$id$key"
         }
     }
 
@@ -162,7 +174,7 @@ class KavitaMediaServer(
                 serverId = id,
                 libraryId = sr.libraryId.toString(),
                 title = sr.localizedName.ifBlank { sr.name },
-                thumbUrl = "${baseUrl.trimEnd('/')}/api/Image/series-cover?seriesId=${sr.seriesId}",
+                thumbUrl = "${baseUrl.trimEnd('/')}/api/Image/series-cover?seriesId=${sr.seriesId}${apiKeyParam()}",
             )
         }
         val books = result.chapters.map { ch ->
@@ -170,6 +182,7 @@ class KavitaMediaServer(
                 serverId = id,
                 baseUrl = baseUrl,
                 seriesId = ch.seriesId,
+                apiKey = credentialStore.getApiKey(id),
             )
         }
         return SearchResults(series = series, books = books)
@@ -181,13 +194,17 @@ class KavitaMediaServer(
     }
 
     override suspend fun recentlyAddedSeries(libraryId: String?): List<Series> {
+        val allSeries = api.getSeries()
         val libId = libraryId?.toIntOrNull()
-        return api.getSeries(libraryId = libId, size = 20).map { it.toDomain(id, baseUrl) }
+        val filtered = if (libId != null) allSeries.filter { it.libraryId == libId } else allSeries
+        return filtered.take(20).map { it.toDomain(id, baseUrl, credentialStore.getApiKey(id)) }
     }
 
     override suspend fun recentlyUpdatedSeries(libraryId: String?): List<Series> {
+        val allSeries = api.getSeries()
         val libId = libraryId?.toIntOrNull()
-        return api.getSeries(libraryId = libId, size = 20).map { it.toDomain(id, baseUrl) }
+        val filtered = if (libId != null) allSeries.filter { it.libraryId == libId } else allSeries
+        return filtered.take(20).map { it.toDomain(id, baseUrl, credentialStore.getApiKey(id)) }
     }
 
     override suspend fun recentlyAddedBooks(libraryId: String?): List<Book> = emptyList()
@@ -197,9 +214,10 @@ class KavitaMediaServer(
     override suspend fun recentlyReadBooks(libraryId: String?): List<Book> = emptyList()
 
     override suspend fun libraryStats(libraryId: String?): LibraryStats {
+        val allSeries = api.getSeries()
         val libId = libraryId?.toIntOrNull()
-        val count = api.getSeries(libraryId = libId, size = 500).size
-        return LibraryStats(seriesCount = count.toLong(), bookCount = 0L)
+        val filtered = if (libId != null) allSeries.filter { it.libraryId == libId } else allSeries
+        return LibraryStats(seriesCount = filtered.size.toLong(), bookCount = 0L)
     }
 
     override suspend fun availableGenres(): List<String> = emptyList()

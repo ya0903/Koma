@@ -4,6 +4,7 @@ import com.koma.client.data.auth.CredentialStore
 import com.koma.client.data.server.calibreweb.CalibreWebMediaServer
 import com.koma.client.data.server.kavita.KavitaMediaServer
 import com.koma.client.data.server.komga.KomgaMediaServer
+import com.koma.client.data.server.opds.OpdsMediaServer
 import com.koma.client.domain.server.MediaServer
 import com.koma.client.domain.server.MediaServerFactory
 import com.koma.client.domain.server.MediaServerType
@@ -41,6 +42,7 @@ object MediaServerFactoryModule {
                 MediaServerType.KOMGA -> KomgaMediaServer(id, baseUrl, credentialStore, baseOkHttpClient, json)
                 MediaServerType.KAVITA -> KavitaMediaServer(id, baseUrl, credentialStore, baseOkHttpClient, json)
                 MediaServerType.CALIBRE_WEB -> CalibreWebMediaServer(id, baseUrl, credentialStore, baseOkHttpClient, json)
+                MediaServerType.OPDS -> OpdsMediaServer(id, baseUrl, credentialStore, baseOkHttpClient)
             }
         }
     }

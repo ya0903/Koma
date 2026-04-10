@@ -439,6 +439,7 @@ private fun TypeBadge(type: MediaServerType) {
         MediaServerType.KOMGA -> "Komga"
         MediaServerType.KAVITA -> "Kavita"
         MediaServerType.CALIBRE_WEB -> "Calibre-Web"
+        MediaServerType.OPDS -> "OPDS"
     }
     SuggestionChip(onClick = {}, label = { Text(label) })
 }

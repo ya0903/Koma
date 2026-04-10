@@ -8,15 +8,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import com.koma.client.R
 import com.koma.client.domain.model.Bookmark
 
 @Composable
@@ -27,6 +28,7 @@ fun ReaderOverlay(
     totalPages: Int,
     bookmarks: List<Bookmark>,
     brightness: Float,
+    isOffline: Boolean = false,
     onBack: () -> Unit,
     onPageChange: (Int) -> Unit,
     onSettingsClick: () -> Unit,
@@ -64,6 +66,18 @@ fun ReaderOverlay(
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
+                // Offline badge
+                if (isOffline) {
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text("Offline", style = MaterialTheme.typography.labelSmall) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        modifier = Modifier.padding(end = 4.dp),
+                    )
+                }
                 // Bookmarks list button
                 IconButton(onClick = onBookmarksListClick) {
                     Icon(Icons.AutoMirrored.Filled.List, "Bookmarks list", tint = Color.White)
@@ -71,9 +85,11 @@ fun ReaderOverlay(
                 // Add/remove bookmark for current page
                 IconButton(onClick = onBookmarkClick) {
                     Icon(
-                        if (isCurrentPageBookmarked) Icons.Filled.Favorite else Icons.Filled.Star,
-                        contentDescription = if (isCurrentPageBookmarked) "Bookmarked" else "Add bookmark",
-                        tint = if (isCurrentPageBookmarked) MaterialTheme.colorScheme.primary else Color.White,
+                        ImageVector.vectorResource(
+                            id = if (isCurrentPageBookmarked) R.drawable.ic_bookmark_fill else R.drawable.ic_bookmark,
+                        ),
+                        contentDescription = if (isCurrentPageBookmarked) "Remove bookmark" else "Add bookmark",
+                        tint = if (isCurrentPageBookmarked) Color(0xFFFFD700) else Color.White,
                     )
                 }
                 // Brightness toggle

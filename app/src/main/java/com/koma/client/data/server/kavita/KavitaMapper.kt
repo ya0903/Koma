@@ -15,19 +15,18 @@ fun KavitaLibraryDto.toDomain(serverId: String): Library = Library(
     name = name,
 )
 
-fun KavitaSeriesDto.toDomain(serverId: String, baseUrl: String): Series {
+fun KavitaSeriesDto.toDomain(serverId: String, baseUrl: String, apiKey: String? = null): Series {
     val base = baseUrl.trimEnd('/')
-    val totalChapters = 0  // Kavita volumes/chapters loaded separately
-    val readCount = if (pages > 0) (pagesRead * totalChapters / pages) else 0
+    val keyParam = if (apiKey != null) "&apiKey=$apiKey" else ""
     return Series(
         id = id.toString(),
         serverId = serverId,
         libraryId = libraryId.toString(),
         title = localizedName.ifBlank { name },
-        bookCount = 0,      // populated when volumes are fetched
-        readBookCount = 0,
-        unreadCount = 0,
-        thumbUrl = "$base/api/Image/series-cover?seriesId=$id",
+        bookCount = pages,  // Kavita uses page count; chapter count populated when volumes loaded
+        readBookCount = pagesRead,
+        unreadCount = (pages - pagesRead).coerceAtLeast(0),
+        thumbUrl = "$base/api/Image/series-cover?seriesId=$id$keyParam",
         summary = metadata.summary?.ifBlank { null },
         genres = metadata.genres.map { it.title },
         tags = metadata.tags.map { it.title },
@@ -45,8 +44,10 @@ fun KavitaChapterDto.toDomain(
     baseUrl: String,
     seriesId: Int,
     seriesTitle: String = "",
+    apiKey: String? = null,
 ): Book {
     val base = baseUrl.trimEnd('/')
+    val keyParam = if (apiKey != null) "&apiKey=$apiKey" else ""
     val chapterNum = number.toIntOrNull()
     val titleDisplay = when {
         title.isNotBlank() -> title
@@ -77,7 +78,7 @@ fun KavitaChapterDto.toDomain(
         mediaType = mediaType,
         number = chapterNum,
         sizeBytes = null,
-        thumbUrl = "$base/api/Image/chapter-cover?chapterId=$id",
+        thumbUrl = "$base/api/Image/chapter-cover?chapterId=$id$keyParam",
         readProgress = progress,
     )
 }

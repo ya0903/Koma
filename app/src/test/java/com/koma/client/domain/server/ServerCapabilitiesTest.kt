@@ -30,8 +30,24 @@ class ServerCapabilitiesTest {
     }
 
     @Test
-    fun mediaServerType_has_all_three_variants() {
+    fun opds_defaults_no_progress_no_native_series_has_native_search() {
+        val caps = ServerCapabilities.opdsDefaults()
+        assertThat(caps.serverProgressSync).isFalse()
+        assertThat(caps.nativeSeries).isFalse()
+        assertThat(caps.nativeSearch).isTrue()
+        assertThat(caps.collections).isFalse()
+        assertThat(caps.readlists).isFalse()
+        assertThat(caps.serverBookmarks).isFalse()
+    }
+
+    @Test
+    fun mediaServerType_has_all_four_variants() {
         assertThat(MediaServerType.values().toSet())
-            .containsExactly(MediaServerType.KOMGA, MediaServerType.KAVITA, MediaServerType.CALIBRE_WEB)
+            .containsExactly(
+                MediaServerType.KOMGA,
+                MediaServerType.KAVITA,
+                MediaServerType.CALIBRE_WEB,
+                MediaServerType.OPDS,
+            )
     }
 }

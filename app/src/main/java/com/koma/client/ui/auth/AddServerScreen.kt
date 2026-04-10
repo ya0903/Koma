@@ -88,6 +88,15 @@ class AddServerViewModel @Inject constructor(
                 s.password,
             )
             serverRepo.setActive(id)
+            // For JWT-based servers (Kavita), authenticate with the real server ID
+            // so the token is stored under the correct key
+            if (s.selectedType == MediaServerType.KAVITA) {
+                val server = serverRepo.getById(id)
+                if (server != null) {
+                    val mediaServer = factory.create(s.selectedType, id, url, s.username, s.password)
+                    mediaServer.authenticate()
+                }
+            }
             _uiState.update { it.copy(saved = true) }
         }
     }
@@ -136,6 +145,7 @@ fun AddServerScreen(
                             MediaServerType.KOMGA -> stringResource(R.string.label_komga)
                             MediaServerType.KAVITA -> stringResource(R.string.label_kavita)
                             MediaServerType.CALIBRE_WEB -> stringResource(R.string.label_calibre_web)
+                            MediaServerType.OPDS -> stringResource(R.string.label_opds)
                         })
                     },
                 )

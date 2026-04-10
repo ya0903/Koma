@@ -3,6 +3,7 @@ package com.koma.client.data.server.kavita
 import com.koma.client.data.server.kavita.dto.KavitaChapterDto
 import com.koma.client.data.server.kavita.dto.KavitaLibraryDto
 import com.koma.client.data.server.kavita.dto.KavitaLoginRequest
+import com.koma.client.data.server.kavita.dto.KavitaSeriesFilterDto
 import com.koma.client.data.server.kavita.dto.KavitaLoginResponse
 import com.koma.client.data.server.kavita.dto.KavitaProgressDto
 import com.koma.client.data.server.kavita.dto.KavitaSearchResultDto
@@ -24,14 +25,12 @@ interface KavitaApi {
     @POST("api/Account/refresh-token")
     suspend fun refreshToken(): KavitaLoginResponse
 
-    @GET("api/Library")
+    @GET("api/Library/libraries")
     suspend fun getLibraries(): List<KavitaLibraryDto>
 
-    @GET("api/Series")
+    @POST("api/Series/all")
     suspend fun getSeries(
-        @Query("libraryId") libraryId: Int? = null,
-        @Query("pageNumber") page: Int = 1,
-        @Query("pageSize") size: Int = 500,
+        @Body body: KavitaSeriesFilterDto = KavitaSeriesFilterDto(),
     ): List<KavitaSeriesDto>
 
     @GET("api/Series/{id}")

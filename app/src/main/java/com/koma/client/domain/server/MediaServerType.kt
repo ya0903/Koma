@@ -1,3 +1,3 @@
 package com.koma.client.domain.server
 
-enum class MediaServerType { KOMGA, KAVITA, CALIBRE_WEB }
+enum class MediaServerType { KOMGA, KAVITA, CALIBRE_WEB, OPDS }

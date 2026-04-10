@@ -10,7 +10,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import com.koma.client.R
 import com.koma.client.domain.model.Bookmark
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -81,6 +85,14 @@ private fun BookmarkItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(
+            ImageVector.vectorResource(id = R.drawable.ic_bookmark_fill),
+            contentDescription = null,
+            tint = Color(0xFFFFD700),
+            modifier = Modifier
+                .padding(end = 12.dp)
+                .size(20.dp),
+        )
         Column(modifier = Modifier.weight(1f)) {
             val pageLabel = bookmark.page?.let { "Page ${it + 1}" } ?: bookmark.locator ?: "Bookmark"
             Text(
