@@ -359,6 +359,7 @@ fun ImageReaderScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     itemsIndexed(state.pageUrls) { index, url ->
                         coil3.compose.SubcomposeAsyncImage(
